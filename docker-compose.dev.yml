@@ -1,0 +1,29 @@
+version: '3'
+
+networks:
+  laravel:
+
+
+services:
+  app:
+    restart: on-failure      
+
+  db:
+    restart: on-failure  
+    ports:
+      - "${DB_EXPOSED_PORT:-3306}:3306" 
+
+  php:
+    restart: on-failure   
+
+  npm:
+    image: node:${NODE_VERSION:-current}-alpine
+    volumes:
+      - ./src:/var/www/html
+    ports:
+      - "${VITE_PORT:-5173}:5173"
+    working_dir: /var/www/html
+    entrypoint: [ 'npm' ]
+    networks:
+      - laravel
+

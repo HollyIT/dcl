@@ -1,87 +1,83 @@
-# docker-compose-laravel
-A pretty simplified Docker Compose workflow that sets up a LEMP network of containers for local Laravel development. You can view the full article that inspired this repo [here](https://dev.to/aschmelyun/the-beauty-of-docker-for-local-laravel-development-13c0).
+# DCL
+  DCL (docker-compose-laravel) is a modified docker-compose workflow for Laravel, based off of the excellent work by [Andrew Schmelyun](https://github.com/aschmelyun/docker-compose-laravel)
+
+  Note that while this was made for Laravel, it also works fine for non-laravel
+  projects, so long as you override the nginx config file to set your
+  public html root. 
 
 ## Usage
 
-To get started, make sure you have [Docker installed](https://docs.docker.com/docker-for-mac/install/) on your system, and then clone this repository.
+Clone this repository and copy the .env.example file to .env. The .env file contains defaults, which should work for most projects, but feel free to edit.
 
-Next, navigate in your terminal to the directory you cloned this, and spin up the containers for the web server by running `docker-compose up -d --build app`.
+The following is the available environment variables
 
-After that completes, follow the steps from the [src/README.md](src/README.md) file to get your Laravel project added in (or create a new blank one).
 
-**Note**: Your MySQL database host name should be `mysql`, **not** `localhost`. The username and database should both be `homestead` with a password of `secret`. 
+|Varaible  |Default  |Description  |Dev  |
+|---------|---------|---------|---------|
+|PHP_VERSION     |8.2         | Set the PHP version (8.0, 8.1, 8.2)        |         |
+|UID     |1000         |User ID to run the container as         |         |
+|GID     |1000         |User GID to run the container as         |         |
+|NGINX_PORT     |80         |Port to expose Nginx on         |         |
+|DB_ROOT_PASSWORD     |password         |Password for root access to database         |         |
+|XDEBUG     |false         |Install the latest XDebug extension         |         |
+|NODE_VERSION     |current         |Version of Node to install         | Y        |
+|DB_EXPOSED_PORT     |3306         |Expose database on this port         |Y         |
+|VITE_PORT     |5173         |Port for the vite server         |Y         |
 
-Bringing up the Docker Compose network with `app` instead of just using `up`, ensures that only our site's containers are brought up at the start, instead of all of the command containers as well. The following are built for our web server, with their exposed ports detailed:
 
-- **nginx** - `:80`
-- **mysql** - `:3306`
-- **php** - `:9000`
-- **redis** - `:6379`
-- **mailhog** - `:8025` 
+You can review the docker-compose file for any other services you might want to enable. Simple go in and uncomment those services.
 
-Three additional containers are included that handle Composer, NPM, and Artisan commands *without* having to have these platforms installed on your local computer. Use the following command examples from your project root, modifying them to fit your particular use case.
+The following services are available:
+|Service  |Description  |Dev Only|
+|---------|---------|------------|
+|nginx     | Web server        |            |
+|app     |  The actual app/php server       |            |
+|db     | Current MySQL version server         |            |
+|npm     | NodeJS server        | Y            |
 
-- `docker-compose run --rm composer update`
-- `docker-compose run --rm npm run dev`
-- `docker-compose run --rm artisan migrate`
 
-## Permissions Issues
 
-If you encounter any issues with filesystem permissions while visiting your application or running a container command, try completing one of the sets of steps below.
+There is a docker-compose.dev.yml with developer options. If you wish to use that, copy it to docker-compose.override.yml.
 
-**If you are using your server or local environment as the root user:**
+To create a new project either clone or download this repo. Inside the directory run:
 
-- Bring any container(s) down with `docker-compose down`
-- Replace any instance of `php.dockerfile` in the docker-compose.yml file with `php.root.dockerfile`
-- Re-build the containers by running `docker-compose build --no-cache`
+`composer create-project laravel/laravel src`
 
-**If you are using your server or local environment as a user that is not root:**
+## DC helper
 
-- Bring any container(s) down with `docker-compose down`
-- In your terminal, run `export UID=$(id -u)` and then `export GID=$(id -g)`
-- If you see any errors about readonly variables from the above step, you can ignore them and continue
-- Re-build the containers by running `docker-compose build --no-cache`
+For starting, stopping, building and all other Docker related stuff, there is a script in the root directory called dc. 
 
-Then, either bring back up your container network or re-run the command you were trying before, and see if that fixes it.
+Typing ./dc help in the root directory will list all of the commands. You can also run composer, npm and artisan from the ./dc file.
 
-## Persistent MySQL Storage
+The current ./dc commands are:
 
-By default, whenever you bring down the Docker network, your MySQL data will be removed after the containers are destroyed. If you would like to have persistent data that remains after bringing containers down and back up, do the following:
 
-1. Create a `mysql` folder in the project root, alongside the `nginx` and `src` folders.
-2. Under the mysql service in your `docker-compose.yml` file, add the following lines:
+|Command  |Description  |Example  |
+|---------|---------|---------|
+|help     |  Show help       |./dc help        |
+|start    |Start all containers   |./dc start         |
+|stop     |Stop all containers         |./dc stop         |
+|restart     |Restart all containers         |./dc restart         |
+|shell  {container}   |Shell into container        |./dc shell php         |
+|artisan ...     |Run an artisan command in the container         |./dc artisan serve         |
+|composer ...     |Ran a composer command in the container         |./dc composer install         |
+|npm ...     |Run an npm command in the container        |./dc npm install         |
+|npx ...     |Run an npx command in the container         |./dc npx run         |
+|logs {container}    |View logs of {container}         |./dc logs php         |
 
-```
-volumes:
-  - ./mysql:/var/lib/mysql
-```
+All other commands passed to DC will be forwarded to docker-compose.
 
-## Usage in Production
+** NOTE: The DC file loads environment variables from .env and src/.env. Be sure to use ./dc instead of docker-compose so your environment is always set.
 
-While I originally created this template for local development, it's robust enough to be used in basic Laravel application deployments. The biggest recommendation would be to ensure that HTTPS is enabled by making additions to the `nginx/default.conf` file and utilizing something like [Let's Encrypt](https://hub.docker.com/r/linuxserver/letsencrypt) to produce an SSL certificate.
+## Extra configuration
 
-## Compiling Assets
+In config/php you'll find a php.ini file that is loaded last when PHP parses config. You can override anything you need in there. 
 
-This configuration should be able to compile assets with both [laravel mix](https://laravel-mix.com/) and [vite](https://vitejs.dev/). In order to get started, you first need to add ` --host 0.0.0.0` after the end of your relevant dev command in `package.json`. So for example, with a Laravel project using Vite, you should see:
+## Future development
 
-```json
-"scripts": {
-  "dev": "vite --host 0.0.0.0",
-  "build": "vite build"
-},
-```
+This was created as a way for me to quickly fire up new Laravel docker-compose projects that can be ran in production or dev, and with a simple wrapper script
+to easily run commands and manage all services.
 
-Then, run the following commands to install your dependencies and start the dev server:
-
-- `docker-compose run --rm npm install`
-- `docker-compose run --rm --service-ports npm run dev`
-
-After that, you should be able to use `@vite` directives to enable hot-module reloading on your local Laravel application.
-
-Want to build for production? Simply run `docker-compose run --rm npm run build`.
-
-## MailHog
-
-The current version of Laravel (9 as of today) uses MailHog as the default application for testing email sending and general SMTP work during local development. Using the provided Docker Hub image, getting an instance set up and ready is simple and straight-forward. The service is included in the `docker-compose.yml` file, and spins up alongside the webserver and database services.
-
-To see the dashboard and view any emails coming through the system, visit [localhost:8025](http://localhost:8025) after running `docker-compose up -d site`.
+If you feel there is anything missing, please feel free to create a PR and
+I'll investigate. That said, I'm sure this will grow over time. I just got
+tired of copying and pasting configurations all the time.

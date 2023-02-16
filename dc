@@ -1,0 +1,98 @@
+#!/bin/bash
+set -euo pipefail
+if test -t 1; then
+    # Determine if colors are supported...
+    ncolors=$(tput colors)
+
+    if test -n "$ncolors" && test "$ncolors" -ge 8; then
+        BOLD="$(tput bold)"
+        YELLOW="$(tput setaf 3)"
+        GREEN="$(tput setaf 2)"
+        NC="$(tput sgr0)"
+    fi
+fi
+
+
+
+function display_help {
+    echo "Docker Compose Laravel Edition"
+    echo
+    echo "${YELLOW}Usage:${NC}" >&2
+    echo "  dc COMMAND [options] [arguments]"
+    echo
+    echo "Unknown commands are passed to the docker-compose binary."
+    echo
+    echo "${GREEN}dc start ${NC}       Start the project"
+    echo "${GREEN}dc stop ${NC}        Stop the project"
+    echo "${GREEN}dc restart ${NC}     Restart the project"    
+    echo
+    echo "${YELLOW}Helper Commands:${NC}"
+    echo "  ${GREEN}dc shell {container_name} ${NC}        Open a shell to container"
+    echo "  ${GREEN}dc artisan ... ${NC}                   Run an artisan command"
+    echo "  ${GREEN}dc composer ... ${NC}                  Run composer"
+    echo "  ${GREEN}dc npm ... ${NC}                       Run npm"    
+    echo "  ${GREEN}dc npx ... ${NC}                       Run npx" 
+    echo "  ${GREEN}dc logs {container} ${NC}              View container logs"     
+    exit 1
+}
+
+
+if [[ "$*" != *"--env-file"* ]]; then
+    set -o allexport
+    if [ -f ./src/.env ]; then
+        source ./src/.env;
+    fi
+
+    if [ -f ./.env ]; then
+        source ./.env;
+    fi
+    set +o allexport
+fi
+
+
+function dockerRun {
+    docker compose &> /dev/null
+        if [ $? == 0 ]; then
+            docker compose $1
+        else
+            docker-compose $1
+        fi
+}
+
+if [ "$1" == "shell" ]; then
+    docker-compose run --rm php /bin/sh
+
+elif [ "$1" == "artisan" ]; then
+    dockerRun "run --rm php /var/www/html/${@}"
+
+elif [ "$1" == "composer" ]; then
+    shift 1
+    dockerRun "run --rm php composer --ignore-platform-reqs ${@}"
+
+elif [ "$1" == "npm" ]; then
+    shift 1
+    dockerRun "run --rm npm npm ${@}"
+
+elif [ "$1" == "npx" ]; then
+    shift 1
+    dockerRun "run --rm npm npx  ${@}"
+
+elif [ "$1" == "start" ]; then
+    dockerRun "up -d"
+
+elif [ "$1" == "stop" ]; then
+    dockerRun "down" 
+
+elif [ "$1" == "restart" ]; then
+    dockerRun "down"
+    dockerRun "up -d"
+
+elif [ "$1" == "logs" ]; then
+    shift 1
+    dockerRun " logs -f ${@}"
+
+elif [ "$1" == "help" ]; then      
+    display_help
+else
+    dockerRun "${@}"
+fi
